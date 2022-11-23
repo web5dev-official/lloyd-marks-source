@@ -1,11 +1,8 @@
 import './App.css';
 import { useState } from 'react';
 import { ethers } from 'ethers'
-
-const Abi = require("./contract/abi.json");
-const Abi2 = require("./contract/abi2.json");
-const address = "0xeD14022E1B5df4f9A238e257074aA1D67087F765";
-const Raindrop_contract = "0xdd37e255f664BCabd3e6CB450E84b609B992d6e5";
+import { Config } from './blockchain/config';
+import { WalletConnect } from './blockchain/wallet';
 const provider = new ethers.providers.JsonRpcProvider(
   'https://eth-mainnet.g.alchemy.com/v2/7xjlT4hGMvqIwVmMKrmVYhVpwF-H9VKh',
 )
@@ -16,16 +13,15 @@ function App() {
   const [NftStatus, setNftStatus] = useState('visible');
   const [ClaimNft, setClaimNft] = useState('none');
   const [BtnStatus, setBtnStatus] = useState("Connect to Mint");
+  const [Signer, setSigner] = useState();
   const [MintAmount, setMintAmount] = useState(1);
   const [Status, setStatus] = useState();
   const [Status_2, setStatus_2] = useState("Wallet not connected")
 
-  const SmartContract = async (obj) => {
-    // const provider = new ethers.providers.JsonRpcProvider(
-    //   'https://eth-rinkeby.alchemyapi.io/v2/XRznHNhMx9axnrPTil7nMXgJf5uDJ5A9',
-    // )
-   const Raindrop_nft = new ethers.Contract(Raindrop_contract,Abi2,provider)
-    const EthBal = await provider.getBalance(obj.address).then((balance) => {
+  const SmartContract = async (Address) => {
+   try {
+    const Raindrop_nft = new ethers.Contract(Config.Raindrop_contract,Config.Abi2,provider)
+    const EthBal = await provider.getBalance(Address).then((balance) => {
       // convert a currency unit from wei to ether
       const balanceInEth = ethers.utils.formatEther(balance)
       if (0.1 > balanceInEth) {
@@ -36,11 +32,11 @@ function App() {
         setStatus_2('please wait contract is loading')
       }
      })
-    const token = new ethers.Contract(address, Abi, provider)
+    const token = new ethers.Contract(Config.address, Config.Abi, provider)
     // const Holder = await token.check_holder(obj.address)
     // console.log(Holder)
     
-    const Raindrop_bal = await Raindrop_nft.balanceOf(obj.address);
+    const Raindrop_bal = await Raindrop_nft.balanceOf(Address);
       if (Raindrop_bal >= 1) {
         setStatus_2("you are raindrop so you get 25% discount on minting on price")
         setClaimNft('visible')
@@ -52,31 +48,26 @@ function App() {
         setNftStatus('visible')
       }
     
-    
-    console.log('this is raindrop balance',BigInt(Raindrop_bal))/* global BigInt */ 
+   } catch (error) {
+    alert("something went wrong")
+   }
+   
   }
  
-  const ETHER_TESTNET_PARAMS = {
-    chainId: '0x1'
-    
-  }
-  function switchToAvalancheChain() {
-    // Request to switch to the selected Avalanche network
-    window.ethereum.request({
-      method: 'wallet_switchEthereumChain',
-        params: [{ chainId: '0x1'}],
-    })
-  }
+
 
   const ClickHandler = async () => {
     if (BtnStatus === "Connect to Mint") {
-       await connectWallet();
+      const obj = await WalletConnect();
+      setSigner(obj.signer);
+      setBtnStatus("Mint Now");
+      SmartContract(obj.Address)
       
     }
     if (BtnStatus === "Mint Now") {
       console.log("ready fo mint")
       const provider = new ethers.providers.Web3Provider(window.ethereum);
-      const token = new ethers.Contract(address, Abi,provider.getSigner());
+      const token = new ethers.Contract(Config.address, Config.Abi,Signer);
       if (Status_2 === "you are not a raindop holder") {
         await token.mint(MintAmount,{value: ethers.utils.parseEther(`${MintAmount*0.1}`)});
       }else{
@@ -89,39 +80,7 @@ function App() {
     }
   }
 
-  const connectWallet = async () => {
-    if (window.ethereum) {
-      try {
-        const addressArray = await window.ethereum.request({
-          method: 'eth_requestAccounts',
-        })
-        const obj = {
-          address: addressArray[0],
-        }
-       setBtnStatus('Mint Now');
-       setStatus(
-        'Connected ' +
-          obj.address.slice(0, 4) +
-          '...' +
-          obj.address.slice(-3),
-      )
-      switchToAvalancheChain()
-      //  setStatus(obj.address);
-       SmartContract(obj);
-        return obj
-      } catch (err) {
-        return {
-          address: '',
-        }
-      }
-    } else {
-      return {
-        address: '',
-      }
-    }
-  }
-
-  return (
+ return(
     <div className="min-h-screen h-full w-full overflow-hidden flex flex-col items-center justify-center bg-brand-background ">
       <div className="relative w-screen h-screen flex flex-col items-center justify-center">
         <img
